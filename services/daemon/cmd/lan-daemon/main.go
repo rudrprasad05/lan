@@ -8,6 +8,10 @@ import (
 )
 
 func main() {
+	storage.InitDB()
+
+	log.Println("Daemon started")
+
 	identity, err := storage.LoadOrCreateIdentity()
 	if err != nil {
 		log.Fatal(err)

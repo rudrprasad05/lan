@@ -1,49 +1,63 @@
 package storage
 
 import (
-	"crypto/ed25519"
-	"encoding/json"
+	"database/sql"
 	"fmt"
+	crypto "lan-share/daemon/internal/cypto"
 	"os"
 	"os/user"
 	"runtime"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 type DeviceIdentity struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	DeviceType string `json:"device_type"`
-	OS         string `json:"os"`
-	OSVersion  string `json:"os_version"`
-	Arch       string `json:"arch"`
-	Hostname   string `json:"hostname"`
-	PublicKey  string `json:"public_key"`
-	PrivateKey string `json:"private_key"`
+	ID         string
+	Name       string
+	DeviceType string
+	OS         string
+	OSVersion  string
+	Arch       string
+	Hostname   string
+	PublicKey  string
+	PrivateKey string
+	CreatedAt  int64
 }
 
 func LoadOrCreateIdentity() (*DeviceIdentity, error) {
-	filePath := "device_identity.json"
+	// 1. Try load existing
+	row := DB.QueryRow(`
+		SELECT id, name, device_type, os, os_version, arch, hostname, public_key, private_key, created_at
+		FROM device_identity
+		LIMIT 1
+	`)
 
-	// Check if file exists
-	if _, err := os.Stat(filePath); err == nil {
-		// Load existing
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, err
-		}
+	var identity DeviceIdentity
 
-		var identity DeviceIdentity
-		if err := json.Unmarshal(data, &identity); err != nil {
-			return nil, err
-		}
+	err := row.Scan(
+		&identity.ID,
+		&identity.Name,
+		&identity.DeviceType,
+		&identity.OS,
+		&identity.OSVersion,
+		&identity.Arch,
+		&identity.Hostname,
+		&identity.PublicKey,
+		&identity.PrivateKey,
+		&identity.CreatedAt,
+	)
 
-		fmt.Println("Loaded existing identity")
+	if err == nil {
+		fmt.Println("Loaded existing identity from DB")
 		return &identity, nil
 	}
 
-	// Create new identity
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	// 2. Create new identity
 	fmt.Println("Creating new device identity...")
 
 	id := uuid.NewString()
@@ -53,16 +67,16 @@ func LoadOrCreateIdentity() (*DeviceIdentity, error) {
 
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
-
-	// simple OS version (we improve later)
 	osVersion := "unknown"
 
-	// generate keypair
-	pub, priv, _ := ed25519.GenerateKey(nil)
+	pub, priv, err := crypto.GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
 
 	name := fmt.Sprintf("%s's device", currentUser.Username)
 
-	identity := DeviceIdentity{
+	identity = DeviceIdentity{
 		ID:         id,
 		Name:       name,
 		DeviceType: "desktop",
@@ -72,19 +86,32 @@ func LoadOrCreateIdentity() (*DeviceIdentity, error) {
 		Hostname:   hostname,
 		PublicKey:  string(pub),
 		PrivateKey: string(priv),
+		CreatedAt:  time.Now().Unix(),
 	}
 
-	// Save to file
-	data, err := json.MarshalIndent(identity, "", "  ")
+	// 3. Insert into DB
+	_, err = DB.Exec(`
+		INSERT INTO device_identity 
+		(id, name, device_type, os, os_version, arch, hostname, public_key, private_key, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		identity.ID,
+		identity.Name,
+		identity.DeviceType,
+		identity.OS,
+		identity.OSVersion,
+		identity.Arch,
+		identity.Hostname,
+		identity.PublicKey,
+		identity.PrivateKey,
+		identity.CreatedAt,
+	)
+
 	if err != nil {
 		return nil, err
 	}
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return nil, err
-	}
-
-	fmt.Println("New identity created and saved")
+	fmt.Println("New identity created and stored in DB")
 
 	return &identity, nil
 }
