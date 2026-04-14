@@ -1,5 +1,11 @@
 package storage
 
+import (
+	"context"
+
+	db "lan-share/daemon/internal/storage/db"
+)
+
 type StoredDevice struct {
 	ID        string
 	Name      string
@@ -9,49 +15,48 @@ type StoredDevice struct {
 	TrustedAt int64
 }
 
-func UpsertDevice(d StoredDevice) error {
-	_, err := DB.Exec(`
-		INSERT INTO devices (id, name, public_key, state, last_seen, trusted_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			state=excluded.state,
-			last_seen=excluded.last_seen,
-			trusted_at=excluded.trusted_at
-	`,
-		d.ID,
-		d.Name,
-		d.PublicKey,
-		d.State,
-		d.LastSeen,
-		d.TrustedAt,
-	)
+func UpdateLastSeen(id string, t int64) error {
+	return Queries.UpdateLastSeen(context.Background(), db.UpdateLastSeenParams{
+		LastSeen: t,
+		ID:       id,
+	})
+}
+func UpdateState(id string, state string) error {
+	return Queries.UpdateState(context.Background(), db.UpdateStateParams{
+		State: state,
+		ID:    id,
+	})
+}
 
-	return err
+func UpsertDevice(d StoredDevice) error {
+	return Queries.UpsertDevice(context.Background(), db.UpsertDeviceParams{
+		ID:        d.ID,
+		Name:      d.Name,
+		PublicKey: d.PublicKey,
+		State:     d.State,
+		LastSeen:  d.LastSeen,
+		TrustedAt: d.TrustedAt,
+	})
 }
 
 func GetDevices() ([]StoredDevice, error) {
-	rows, err := DB.Query(`SELECT id, name, public_key, state, last_seen, trusted_at FROM devices`)
+
+	rows, err := Queries.GetDevices(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var list []StoredDevice
+	list := make([]StoredDevice, 0, len(rows))
 
-	for rows.Next() {
-		var d StoredDevice
-		err := rows.Scan(
-			&d.ID,
-			&d.Name,
-			&d.PublicKey,
-			&d.State,
-			&d.LastSeen,
-			&d.TrustedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, d)
+	for _, r := range rows {
+		list = append(list, StoredDevice{
+			ID:        r.ID,
+			Name:      r.Name,
+			PublicKey: r.PublicKey,
+			State:     r.State,
+			LastSeen:  r.LastSeen,
+			TrustedAt: r.TrustedAt,
+		})
 	}
 
 	return list, nil

@@ -5,63 +5,62 @@ import (
 	"log"
 
 	_ "modernc.org/sqlite"
+
+	db "lan-share/daemon/internal/storage/db"
 )
 
-var DB *sql.DB
+var Conn *sql.DB
+var Queries *db.Queries
 
 func InitDB() {
 	var err error
 
-	DB, err = sql.Open("sqlite", "lan-share.db")
+	Conn, err = sql.Open("sqlite", "lan-share.db")
 	if err != nil {
-		log.Fatal("failed to open database:", err)
+		log.Fatal(err)
 	}
 
-	if err = DB.Ping(); err != nil {
-		log.Fatal("failed to connect to database:", err)
+	if err = Conn.Ping(); err != nil {
+		log.Fatal(err)
 	}
 
-	log.Println("SQLite connected")
+	Queries = db.New(Conn)
+
+	log.Println("SQLite + sqlc initialized")
 
 	initTables()
 }
 
 func initTables() {
-	createDeviceTable := `
+	_, err := Conn.Exec(`
 	CREATE TABLE IF NOT EXISTS device_identity (
 		id TEXT PRIMARY KEY,
-		name TEXT,
-		device_type TEXT,
-		os TEXT,
-		os_version TEXT,
-		arch TEXT,
-		hostname TEXT,
-		public_key TEXT,
-		private_key TEXT,
-		created_at INTEGER
+		name TEXT NOT NULL,
+		device_type TEXT NOT NULL,
+		os TEXT NOT NULL,
+		os_version TEXT NOT NULL,
+		arch TEXT NOT NULL,
+		hostname TEXT NOT NULL,
+		public_key TEXT NOT NULL,
+		private_key TEXT NOT NULL,
+		created_at INTEGER NOT NULL
 	);
-	`
-
-	createDevicesTable := `
-	CREATE TABLE IF NOT EXISTS devices (
-		id TEXT PRIMARY KEY,
-		name TEXT,
-		public_key TEXT,
-		state TEXT,
-		last_seen INTEGER,
-		trusted_at INTEGER
-	);
-	`
-
-	_, err := DB.Exec(createDeviceTable)
-	if err != nil {
-		log.Fatal("failed to create tables:", err)
-	}
-
-	_, err = DB.Exec(createDevicesTable)
+	`)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("Tables initialized")
+	_, err = Conn.Exec(`
+	CREATE TABLE IF NOT EXISTS devices (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		public_key TEXT NOT NULL,
+		state TEXT NOT NULL,
+		last_seen INTEGER NOT NULL,
+		trusted_at INTEGER NOT NULL
+	);
+	`)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

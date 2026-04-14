@@ -7,4 +7,5 @@ type DeviceMessage struct {
 	OS   string `json:"os"`   // linux, windows, mac
 	Arch string `json:"arch"`
 	Port int    `json:"port"` // gRPC port later
+	Key  string `json:"key"`
 }

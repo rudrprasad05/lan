@@ -1,13 +1,15 @@
 package storage
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	crypto "lan-share/daemon/internal/cypto"
 	"os"
 	"os/user"
 	"runtime"
 	"time"
+
+	crypto "lan-share/daemon/internal/cypto"
+	"lan-share/daemon/internal/storage/db"
 
 	"github.com/google/uuid"
 )
@@ -26,92 +28,69 @@ type DeviceIdentity struct {
 }
 
 func LoadOrCreateIdentity() (*DeviceIdentity, error) {
+
+	ctx := context.Background()
+
 	// 1. Try load existing
-	row := DB.QueryRow(`
-		SELECT id, name, device_type, os, os_version, arch, hostname, public_key, private_key, created_at
-		FROM device_identity
-		LIMIT 1
-	`)
-
-	var identity DeviceIdentity
-
-	err := row.Scan(
-		&identity.ID,
-		&identity.Name,
-		&identity.DeviceType,
-		&identity.OS,
-		&identity.OSVersion,
-		&identity.Arch,
-		&identity.Hostname,
-		&identity.PublicKey,
-		&identity.PrivateKey,
-		&identity.CreatedAt,
-	)
-
+	row, err := Queries.GetIdentity(ctx)
 	if err == nil {
-		fmt.Println("Loaded existing identity from DB")
-		return &identity, nil
-	}
 
-	if err != sql.ErrNoRows {
-		return nil, err
+		return &DeviceIdentity{
+			ID:         row.ID,
+			Name:       row.Name,
+			DeviceType: row.DeviceType,
+			OS:         row.Os,
+			OSVersion:  row.OsVersion,
+			Arch:       row.Arch,
+			Hostname:   row.Hostname,
+			PublicKey:  row.PublicKey,
+			PrivateKey: row.PrivateKey,
+			CreatedAt:  row.CreatedAt,
+		}, nil
 	}
 
 	// 2. Create new identity
-	fmt.Println("Creating new device identity...")
 
 	id := uuid.NewString()
 
 	hostname, _ := os.Hostname()
 	currentUser, _ := user.Current()
 
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
-	osVersion := "unknown"
-
 	pub, priv, err := crypto.GenerateKeyPair()
 	if err != nil {
 		return nil, err
 	}
 
-	name := fmt.Sprintf("%s's device", currentUser.Username)
-
-	identity = DeviceIdentity{
+	identity := DeviceIdentity{
 		ID:         id,
-		Name:       name,
+		Name:       fmt.Sprintf("%s's device", currentUser.Username),
 		DeviceType: "desktop",
-		OS:         osName,
-		OSVersion:  osVersion,
-		Arch:       arch,
+		OS:         runtime.GOOS,
+		OSVersion:  "unknown",
+		Arch:       runtime.GOARCH,
 		Hostname:   hostname,
 		PublicKey:  string(pub),
 		PrivateKey: string(priv),
 		CreatedAt:  time.Now().Unix(),
 	}
 
-	// 3. Insert into DB
-	_, err = DB.Exec(`
-		INSERT INTO device_identity 
-		(id, name, device_type, os, os_version, arch, hostname, public_key, private_key, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		identity.ID,
-		identity.Name,
-		identity.DeviceType,
-		identity.OS,
-		identity.OSVersion,
-		identity.Arch,
-		identity.Hostname,
-		identity.PublicKey,
-		identity.PrivateKey,
-		identity.CreatedAt,
-	)
+	// 3. Insert via sqlc
+	err = Queries.CreateIdentity(ctx, db.CreateIdentityParams{
+		ID:         identity.ID,
+		Name:       identity.Name,
+		DeviceType: identity.DeviceType,
+		Os:         identity.OS,
+		OsVersion:  identity.OSVersion,
+		Arch:       identity.Arch,
+		Hostname:   identity.Hostname,
+		PublicKey:  identity.PublicKey,
+		PrivateKey: identity.PrivateKey,
+		CreatedAt:  identity.CreatedAt,
+	})
 
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("New identity created and stored in DB")
 
 	return &identity, nil
 }

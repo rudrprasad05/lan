@@ -5,16 +5,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"lan-share/daemon/internal/device"
 	"lan-share/daemon/internal/discovery"
+	"lan-share/daemon/internal/storage"
 )
 
 type CLI struct {
 	Registry *discovery.Registry
+	Service  *device.Service
 }
 
-func NewCLI(reg *discovery.Registry) *CLI {
-	return &CLI{Registry: reg}
+func NewCLI(reg *discovery.Registry, svc *device.Service) *CLI {
+	return &CLI{
+		Registry: reg,
+		Service:  svc,
+	}
 }
 
 func (c *CLI) Start() {
@@ -39,7 +46,8 @@ func (c *CLI) Start() {
 				fmt.Println("usage: trust <id>")
 				continue
 			}
-			c.Registry.SetState(parts[1], discovery.Trusted)
+
+			c.Service.Trust(parts[1])
 			fmt.Println("trusted:", parts[1])
 
 		case "reject":
@@ -47,7 +55,8 @@ func (c *CLI) Start() {
 				fmt.Println("usage: reject <id>")
 				continue
 			}
-			c.Registry.SetState(parts[1], discovery.Rejected)
+
+			c.Service.Reject(parts[1])
 			fmt.Println("rejected:", parts[1])
 
 		default:
@@ -57,15 +66,18 @@ func (c *CLI) Start() {
 }
 
 func (c *CLI) list() {
-	devices := c.Registry.GetAll()
+	devs, err := storage.GetDevices()
+	if err != nil {
+		fmt.Println("db error:", err)
+		return
+	}
 
-	for _, d := range devices {
-		fmt.Printf("%s | %s | %s | %s | %s\n",
+	for _, d := range devs {
+		fmt.Printf("%s | %s | %s | %s\n",
 			d.ID,
 			d.Name,
-			d.IP,
-			d.OS,
 			d.State,
+			time.Unix(d.LastSeen, 0).Format("15:04:05"),
 		)
 	}
 }

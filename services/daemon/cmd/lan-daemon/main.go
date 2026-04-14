@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
-	"runtime"
-
 	"lan-share/daemon/internal/cli"
+	"lan-share/daemon/internal/device"
 	"lan-share/daemon/internal/discovery"
+	"lan-share/daemon/internal/node"
 	"lan-share/daemon/internal/storage"
+	"log"
 )
 
 func main() {
@@ -16,23 +16,19 @@ func main() {
 	identity, err := storage.LoadOrCreateIdentity()
 	if err != nil {
 		log.Fatal(err)
+		return
 	}
 
+	ctx := &node.NodeContext{
+		Identity: identity,
+	}
 	reg := discovery.NewRegistry()
+	svc := device.NewService()
 
-	msg := discovery.DeviceMessage{
-		ID:   identity.ID,
-		Name: identity.Name,
-		Type: identity.DeviceType,
-		OS:   runtime.GOOS,
-		Arch: runtime.GOARCH,
-		Port: 50052,
-	}
+	go discovery.StartBroadcaster(ctx)
+	go discovery.StartListener(ctx, reg)
 
-	go discovery.StartBroadcaster(msg)
-	go discovery.StartListener(reg)
-
-	go cli.NewCLI(reg).Start()
+	go cli.NewCLI(reg, svc).Start()
 
 	log.Println("System running")
 
