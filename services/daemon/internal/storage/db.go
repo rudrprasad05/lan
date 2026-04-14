@@ -42,9 +42,25 @@ func initTables() {
 	);
 	`
 
+	createDevicesTable := `
+	CREATE TABLE IF NOT EXISTS devices (
+		id TEXT PRIMARY KEY,
+		name TEXT,
+		public_key TEXT,
+		state TEXT,
+		last_seen INTEGER,
+		trusted_at INTEGER
+	);
+	`
+
 	_, err := DB.Exec(createDeviceTable)
 	if err != nil {
 		log.Fatal("failed to create tables:", err)
+	}
+
+	_, err = DB.Exec(createDevicesTable)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	log.Println("Tables initialized")

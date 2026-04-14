@@ -9,6 +9,7 @@ type Device struct {
 	DeviceMessage
 	IP       string
 	LastSeen time.Time
+	State    DeviceState
 }
 
 type Registry struct {
@@ -22,14 +23,23 @@ func NewRegistry() *Registry {
 	}
 }
 
-func (r *Registry) Upsert(d DeviceMessage, ip string) {
+func (r *Registry) Upsert(msg DeviceMessage, ip string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.devices[d.ID] = &Device{
-		DeviceMessage: d,
+	d, exists := r.devices[msg.ID]
+
+	if exists {
+		d.LastSeen = time.Now()
+		d.IP = ip
+		return
+	}
+
+	r.devices[msg.ID] = &Device{
+		DeviceMessage: msg,
 		IP:            ip,
 		LastSeen:      time.Now(),
+		State:         Seen,
 	}
 }
 
@@ -37,20 +47,18 @@ func (r *Registry) GetAll() []Device {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	var list []Device
+	out := make([]Device, 0, len(r.devices))
 	for _, d := range r.devices {
-		list = append(list, *d)
+		out = append(out, *d)
 	}
-	return list
+	return out
 }
 
-func (r *Registry) Cleanup(timeout time.Duration) {
+func (r *Registry) SetState(id string, state DeviceState) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for id, d := range r.devices {
-		if time.Since(d.LastSeen) > timeout {
-			delete(r.devices, id)
-		}
+	if d, ok := r.devices[id]; ok {
+		d.State = state
 	}
 }

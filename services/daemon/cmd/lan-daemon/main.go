@@ -1,15 +1,17 @@
 package main
 
 import (
+	"log"
+	"runtime"
+
+	"lan-share/daemon/internal/cli"
 	"lan-share/daemon/internal/discovery"
 	"lan-share/daemon/internal/storage"
-	"log"
 )
 
 func main() {
-	storage.InitDB()
 
-	log.Println("Daemon started")
+	storage.InitDB()
 
 	identity, err := storage.LoadOrCreateIdentity()
 	if err != nil {
@@ -22,15 +24,17 @@ func main() {
 		ID:   identity.ID,
 		Name: identity.Name,
 		Type: identity.DeviceType,
-		OS:   identity.OS,
-		Arch: identity.Arch,
+		OS:   runtime.GOOS,
+		Arch: runtime.GOARCH,
 		Port: 50052,
 	}
 
 	go discovery.StartBroadcaster(msg)
 	go discovery.StartListener(reg)
 
-	log.Println("Discovery running...")
+	go cli.NewCLI(reg).Start()
 
-	select {} // block forever
+	log.Println("System running")
+
+	select {}
 }
