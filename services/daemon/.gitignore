@@ -1,0 +1,7 @@
+# SQLite / local data
+*.db
+*.sqlite
+*.sqlite3
+
+# local runtime files (optional but recommended)
+device_identity.json
