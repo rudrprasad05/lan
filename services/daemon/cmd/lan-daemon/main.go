@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"log"
-
+	"lan-share/daemon/internal/discovery"
 	"lan-share/daemon/internal/storage"
+	"log"
 )
 
 func main() {
@@ -17,9 +16,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Device Identity:")
-	fmt.Println("ID:", identity.ID)
-	fmt.Println("Name:", identity.Name)
-	fmt.Println("OS:", identity.OS, identity.OSVersion)
-	fmt.Println("Arch:", identity.Arch)
+	reg := discovery.NewRegistry()
+
+	msg := discovery.DeviceMessage{
+		ID:   identity.ID,
+		Name: identity.Name,
+		Type: identity.DeviceType,
+		OS:   identity.OS,
+		Arch: identity.Arch,
+		Port: 50052,
+	}
+
+	go discovery.StartBroadcaster(msg)
+	go discovery.StartListener(reg)
+
+	log.Println("Discovery running...")
+
+	select {} // block forever
 }
