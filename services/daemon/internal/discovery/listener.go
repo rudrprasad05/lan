@@ -43,6 +43,8 @@ func StartListener(ctx *node.NodeContext, reg *Registry) {
 		reg.Upsert(msg, remote.IP.String())
 
 		if identity.PublicKey == msg.Key {
+			reg.SetState(msg.ID, Me)
+
 			if err := storage.UpdateState(msg.ID, "me"); err != nil {
 				log.Println("db sync error (state):", err)
 			}
@@ -51,7 +53,7 @@ func StartListener(ctx *node.NodeContext, reg *Registry) {
 				log.Println("db sync error (last_seen):", err)
 			}
 
-			return
+			continue
 		}
 
 		err = storage.UpsertDevice(storage.StoredDevice{

@@ -7,4 +7,5 @@ const (
 	Seen     DeviceState = "seen"
 	Trusted  DeviceState = "trusted"
 	Rejected DeviceState = "rejected"
+	Me       DeviceState = "me"
 )
