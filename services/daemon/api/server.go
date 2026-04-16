@@ -28,7 +28,7 @@ func NewServer(addr string, reg *discovery.Registry, selfID string) *Server {
 	mux.HandleFunc("/api/health", s.healthHandler)
 	mux.HandleFunc("/api/devices", s.devicesHandler)
 
-	handler := middleware.LoggingMiddleware(mux)
+	handler := middleware.CORSMiddleware(middleware.LoggingMiddleware(mux))
 
 	s.server = &http.Server{
 		Addr:              addr,
