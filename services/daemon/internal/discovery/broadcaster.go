@@ -21,13 +21,13 @@ func StartBroadcaster(ctx *node.NodeContext) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	msg := DeviceMessage{
-		ID:   ctx.Identity.ID,
-		Name: ctx.Identity.Name,
-		Type: ctx.Identity.DeviceType,
-		OS:   runtime.GOOS,
-		Arch: runtime.GOARCH,
-		Port: 50052,
-		Key:  ctx.Identity.PublicKey,
+		ID:         ctx.Identity.ID,
+		Name:       ctx.Identity.Name,
+		DeviceType: ctx.Identity.DeviceType,
+		OS:         runtime.GOOS,
+		Arch:       runtime.GOARCH,
+		Port:       50052,
+		Key:        ctx.Identity.PublicKey,
 	}
 
 	for range ticker.C {

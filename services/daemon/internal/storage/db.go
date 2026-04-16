@@ -2,11 +2,10 @@ package storage
 
 import (
 	"database/sql"
+	"lan-share/daemon/internal/storage/db"
 	"log"
 
 	_ "modernc.org/sqlite"
-
-	db "lan-share/daemon/internal/storage/db"
 )
 
 var Conn *sql.DB

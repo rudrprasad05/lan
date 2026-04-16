@@ -17,7 +17,7 @@ import (
 type DeviceIdentity struct {
 	ID         string
 	Name       string
-	DeviceType string
+	DeviceType DeviceType `json:"deviceType"`
 	OS         string
 	OSVersion  string
 	Arch       string
@@ -25,6 +25,50 @@ type DeviceIdentity struct {
 	PublicKey  string
 	PrivateKey string
 	CreatedAt  int64
+}
+
+type DeviceType string
+
+const (
+	DeviceDesktop DeviceType = "desktop"
+	DeviceLaptop  DeviceType = "laptop"
+	DeviceMobile  DeviceType = "mobile"
+)
+
+func DetectDeviceType() DeviceType {
+	switch runtime.GOOS {
+
+	case "android", "ios":
+		return DeviceMobile
+
+	case "darwin":
+		// macOS → assume laptop (most are MacBooks)
+		return DeviceLaptop
+
+	case "windows", "linux":
+		// Try battery detection (laptop vs desktop)
+		if hasBattery() {
+			return DeviceLaptop
+		}
+		return DeviceDesktop
+
+	default:
+		return DeviceDesktop
+	}
+}
+
+func hasBattery() bool {
+	_, err := os.Stat("/sys/class/power_supply/BAT0")
+	return err == nil
+}
+
+func ParseDeviceType(s string) DeviceType {
+	switch DeviceType(s) {
+	case DeviceDesktop, DeviceLaptop, DeviceMobile:
+		return DeviceType(s)
+	default:
+		return DeviceDesktop // fallback
+	}
 }
 
 func LoadOrCreateIdentity() (*DeviceIdentity, error) {
@@ -38,7 +82,7 @@ func LoadOrCreateIdentity() (*DeviceIdentity, error) {
 		return &DeviceIdentity{
 			ID:         row.ID,
 			Name:       row.Name,
-			DeviceType: row.DeviceType,
+			DeviceType: ParseDeviceType(row.DeviceType),
 			OS:         row.Os,
 			OSVersion:  row.OsVersion,
 			Arch:       row.Arch,
@@ -78,7 +122,7 @@ func LoadOrCreateIdentity() (*DeviceIdentity, error) {
 	err = Queries.CreateIdentity(ctx, db.CreateIdentityParams{
 		ID:         identity.ID,
 		Name:       identity.Name,
-		DeviceType: identity.DeviceType,
+		DeviceType: string(identity.DeviceType),
 		Os:         identity.OS,
 		OsVersion:  identity.OSVersion,
 		Arch:       identity.Arch,

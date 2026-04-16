@@ -60,6 +60,7 @@ function PairedDevices() {
 }
 
 function DeviceCard({ device }: DeviceCardProps) {
+  console.log(device);
   const icon =
     device.type === "mac" ? (
       <Laptop />
