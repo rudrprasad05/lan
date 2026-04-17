@@ -30,6 +30,7 @@ func (r *Registry) Upsert(msg DeviceMessage, ip string) {
 	d, exists := r.devices[msg.ID]
 
 	if exists {
+		d.DeviceMessage = msg
 		d.LastSeen = time.Now()
 		d.IP = ip
 		return
@@ -52,6 +53,18 @@ func (r *Registry) GetAll() []Device {
 		out = append(out, *d)
 	}
 	return out
+}
+
+func (r *Registry) GetByID(id string) (Device, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	device, ok := r.devices[id]
+	if !ok {
+		return Device{}, false
+	}
+
+	return *device, true
 }
 
 func (r *Registry) SetState(id string, state DeviceState) {

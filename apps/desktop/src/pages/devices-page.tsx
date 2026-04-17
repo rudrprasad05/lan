@@ -128,12 +128,14 @@ function DeviceCard({ device }: DeviceCardProps) {
           try {
             const formData = new FormData();
             formData.append("file", file);
-            formData.append("deviceId", deviceId);
 
-            const response = await fetch(`${API_BASE_URL}/api/files`, {
-              method: "POST",
-              body: formData,
-            });
+            const response = await fetch(
+              `${API_BASE_URL}/api/files?deviceId=${encodeURIComponent(deviceId)}`,
+              {
+                method: "POST",
+                body: formData,
+              },
+            );
 
             if (!response.ok) {
               throw new Error(`File upload failed with ${response.status}.`);

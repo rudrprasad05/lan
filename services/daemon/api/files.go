@@ -5,9 +5,10 @@ import (
 	"errors"
 	"io"
 	"lan-share/daemon/api/res"
+	"lan-share/daemon/internal/discovery"
 	"lan-share/daemon/internal/filetransfer"
-	"log"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
@@ -40,7 +41,7 @@ func (s *Server) filesHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.listFilesHandler(w, r)
 	case http.MethodPost:
-		s.uploadFileHandler(w, r)
+		s.sendFileHandler(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -67,9 +68,52 @@ func (s *Server) listFilesHandler(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-func (s *Server) uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) sendFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	log.Println("uploading file")
+
+	targetID := strings.TrimSpace(r.URL.Query().Get("deviceId"))
+	if targetID == "" {
+		http.Error(w, "missing deviceId", http.StatusBadRequest)
+		return
+	}
+
+	target, ok := s.reg.GetByID(targetID)
+	if !ok {
+		http.Error(w, "target device not found", http.StatusNotFound)
+		return
+	}
+	if target.State == discovery.Me || target.ID == s.selfID {
+		http.Error(w, "cannot send to self", http.StatusBadRequest)
+		return
+	}
+
+	filename, contentType, body, closeFn, err := extractUpload(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer closeFn()
+
+	stored, err := s.forwardFileToPeer(target, filename, contentType, body)
+	if err != nil {
+		http.Error(w, "failed to deliver file to peer", http.StatusBadGateway)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(FileUploadResponse{
+		BaseResponse: res.NewBaseResponse(),
+		File:         toFileResponse(stored),
+	})
+}
+
+func (s *Server) receiveFileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 
 	filename, contentType, body, closeFn, err := extractUpload(r)
 	if err != nil {
@@ -85,7 +129,6 @@ func (s *Server) uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	log.Println("sending file")
 	_ = json.NewEncoder(w).Encode(FileUploadResponse{
 		BaseResponse: res.NewBaseResponse(),
 		File:         toFileResponse(stored),
@@ -97,7 +140,6 @@ func (s *Server) fileDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	log.Println("downlaoding file")
 
 	id := strings.TrimPrefix(r.URL.Path, "/api/files/")
 	if id == "" || strings.Contains(id, "/") {
@@ -188,3 +230,56 @@ func extractUpload(r *http.Request) (string, string, io.Reader, func(), error) {
 }
 
 func noopClose() {}
+
+func (s *Server) forwardFileToPeer(target discovery.Device, filename, contentType string, body io.Reader) (filetransfer.StoredFile, error) {
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		part, err := writer.CreateFormFile("file", filename)
+		if err != nil {
+			_ = pw.CloseWithError(err)
+			return
+		}
+
+		if _, err := io.Copy(part, body); err != nil {
+			_ = pw.CloseWithError(err)
+			return
+		}
+	}()
+
+	req, err := http.NewRequest(http.MethodPost, s.apiURL(target.IP, "/api/files/receive"), pr)
+	if err != nil {
+		return filetransfer.StoredFile{}, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	if contentType != "" {
+		req.Header.Set("X-Original-Content-Type", contentType)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return filetransfer.StoredFile{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return filetransfer.StoredFile{}, errors.New("peer rejected file transfer")
+	}
+
+	var payload FileUploadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return filetransfer.StoredFile{}, err
+	}
+
+	return filetransfer.StoredFile{
+		ID:          payload.File.ID,
+		Name:        payload.File.Name,
+		Size:        payload.File.Size,
+		ContentType: payload.File.ContentType,
+		CreatedAt:   payload.File.CreatedAt,
+	}, nil
+}

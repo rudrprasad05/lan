@@ -24,7 +24,7 @@ func main() {
 	}
 	reg := discovery.NewRegistry()
 	fileStore := filetransfer.NewService(filetransfer.ResolveStorageDir())
-	apiServer := api.NewServer("127.0.0.1:43821", reg, identity.ID, fileStore)
+	apiServer := api.NewServer("0.0.0.0:43821", reg, identity.ID, fileStore)
 	go func() {
 		if err := apiServer.Start(); err != nil {
 			log.Println("api server stopped:", err)
