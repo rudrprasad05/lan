@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	dataSuffix = ".bin"
 	metaSuffix = ".meta.json"
 )
 
@@ -56,8 +55,9 @@ func (s *Service) Save(name, contentType string, src io.Reader) (StoredFile, err
 		return StoredFile{}, err
 	}
 
-	tmpDataPath := s.dataPath(id) + ".tmp"
-	finalDataPath := s.dataPath(id)
+	storedName := filepath.Base(name)
+	finalDataPath := s.dataPath(id, storedName)
+	tmpDataPath := finalDataPath + ".tmp"
 
 	dst, err := os.Create(tmpDataPath)
 	if err != nil {
@@ -81,7 +81,7 @@ func (s *Service) Save(name, contentType string, src io.Reader) (StoredFile, err
 
 	file := StoredFile{
 		ID:          id,
-		Name:        filepath.Base(name),
+		Name:        storedName,
 		Size:        size,
 		ContentType: contentType,
 		CreatedAt:   time.Now().Unix(),
@@ -136,7 +136,7 @@ func (s *Service) Open(id string) (StoredFile, *os.File, error) {
 		return StoredFile{}, nil, err
 	}
 
-	f, err := os.Open(s.dataPath(id))
+	f, err := os.Open(s.resolveDataPath(id, meta.Name))
 	if err != nil {
 		return StoredFile{}, nil, err
 	}
@@ -163,12 +163,26 @@ func (s *Service) readMeta(id string) (StoredFile, error) {
 	return meta, nil
 }
 
-func (s *Service) dataPath(id string) string {
-	return filepath.Join(s.dir, id+dataSuffix)
+func (s *Service) dataPath(id, originalName string) string {
+	return filepath.Join(s.dir, id+safeExt(originalName))
 }
 
 func (s *Service) metaPath(id string) string {
 	return filepath.Join(s.dir, id+metaSuffix)
+}
+
+func (s *Service) resolveDataPath(id, originalName string) string {
+	currentPath := s.dataPath(id, originalName)
+	if _, err := os.Stat(currentPath); err == nil {
+		return currentPath
+	}
+
+	legacyPath := filepath.Join(s.dir, id+".bin")
+	if _, err := os.Stat(legacyPath); err == nil {
+		return legacyPath
+	}
+
+	return currentPath
 }
 
 func ResolveStorageDir() string {
@@ -234,4 +248,23 @@ func validID(id string) bool {
 
 	_, err := hex.DecodeString(id)
 	return err == nil && len(id)%2 == 0
+}
+
+func safeExt(name string) string {
+	ext := strings.ToLower(filepath.Ext(name))
+	if ext == "" || ext == "." {
+		return ""
+	}
+
+	if len(ext) > 16 {
+		return ""
+	}
+
+	for _, r := range ext[1:] {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') {
+			return ""
+		}
+	}
+
+	return ext
 }
