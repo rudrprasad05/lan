@@ -34,7 +34,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
     }
 
     loadDevices();
-    const interval = window.setInterval(loadDevices, 3000);
+    const interval = window.setInterval(loadDevices, 5000);
 
     return () => {
       active = false;

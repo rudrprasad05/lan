@@ -1,4 +1,6 @@
-import { Laptop, Monitor, Smartphone } from "lucide-react";
+import { Laptop, Monitor, RefreshCcw, Smartphone } from "lucide-react";
+import { useState } from "react";
+import { SendFileModal } from "../components/file/SendFile";
 import { useDevices } from "../context/device-context";
 import { DeviceCardProps } from "../lib/models/types";
 
@@ -11,9 +13,10 @@ export function DevicesPage() {
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-semibold text-white">• Available Devices</h2>
-        <span className="rounded-full bg-blue-500 px-3 py-1 text-xs text-white">
-          SCANNING LOCAL MESH
-        </span>
+        <button className="hover:cursor-pointer flex items-center gap-2">
+          {isLoading && "Scanning"}
+          <RefreshCcw className="w-6 h-6" />
+        </button>
       </div>
 
       {isLoading ? (
@@ -60,23 +63,27 @@ function PairedDevices() {
 }
 
 function DeviceCard({ device }: DeviceCardProps) {
+  const [open, setOpen] = useState(false);
+  const { devices } = useDevices();
+
   console.log(device);
   const icon =
-    device.type === "laptop" ? (
+    device.type == "laptop" ? (
       <Laptop />
-    ) : device.type === "desktop" ? (
+    ) : device.type == "desktop" ? (
       <Monitor />
     ) : (
       <Smartphone />
     );
 
+  const os =
+    device.os == "darwin" ? "OSX" : device.os == "windows" ? "WIN" : "Unknown";
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-[#111a2e] bg-[#0b1220] p-4">
       <div className="flex items-center gap-2 text-gray-300">
         {icon}
-        <span className="rounded bg-blue-600 px-2 py-0.5 text-xs">
-          {device.os}
-        </span>
+        <span className="rounded bg-blue-600 px-2 py-0.5 text-xs">{os}</span>
       </div>
 
       <div>
@@ -87,9 +94,21 @@ function DeviceCard({ device }: DeviceCardProps) {
         </div>
       </div>
 
-      <button className="mt-auto rounded bg-blue-600 py-1.5 text-sm text-white hover:bg-blue-500">
-        Pair Device
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="mt-auto rounded bg-blue-600 py-1.5 text-sm text-white hover:bg-blue-500"
+      >
+        Send
       </button>
+      <SendFileModal
+        open={open}
+        onClose={() => setOpen(false)}
+        devices={devices}
+        selectedDeviceId={device.id}
+        onSend={async (file, deviceId) => {
+          console.log("send", { file, deviceId });
+        }}
+      />
     </div>
   );
 }

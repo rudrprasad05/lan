@@ -33,18 +33,24 @@ function mapApiDevice(device: ApiDevicesResponse["devices"][number]): Device {
 }
 
 function normalizeDeviceType(type: string, os: string): Device["type"] {
-  const value = `${type} ${os}`.toLowerCase();
+  const normalizedType = type.toLowerCase();
+  const normalizedOs = os.toLowerCase();
 
-  if (value.includes("mac")) {
-    return "mac";
+  if (normalizedType === "laptop") {
+    return "laptop";
+  }
+
+  if (normalizedType === "desktop") {
+    return "desktop";
   }
 
   if (
-    value.includes("phone") ||
-    value.includes("android") ||
-    value.includes("ios")
+    normalizedType === "mobile" ||
+    normalizedType === "phone" ||
+    normalizedOs.includes("android") ||
+    normalizedOs.includes("ios")
   ) {
-    return "phone";
+    return "mobile";
   }
 
   return "desktop";

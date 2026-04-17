@@ -12,7 +12,6 @@ dist
 dist-ssr
 *.local
 .codex
-lan-daemon
 proto
 
 # Editor directories and files

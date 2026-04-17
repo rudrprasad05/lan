@@ -3,6 +3,7 @@ package main
 import (
 	"lan-share/daemon/api"
 	"lan-share/daemon/internal/discovery"
+	"lan-share/daemon/internal/filetransfer"
 	"lan-share/daemon/internal/node"
 	"lan-share/daemon/internal/storage"
 	"log"
@@ -22,7 +23,8 @@ func main() {
 		Identity: identity,
 	}
 	reg := discovery.NewRegistry()
-	apiServer := api.NewServer("127.0.0.1:43821", reg, identity.ID)
+	fileStore := filetransfer.NewService(filetransfer.ResolveStorageDir())
+	apiServer := api.NewServer("127.0.0.1:43821", reg, identity.ID, fileStore)
 	go func() {
 		if err := apiServer.Start(); err != nil {
 			log.Println("api server stopped:", err)
