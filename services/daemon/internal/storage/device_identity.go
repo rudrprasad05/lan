@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/user"
 	"runtime"
@@ -36,13 +37,15 @@ const (
 )
 
 func DetectDeviceType() DeviceType {
+	log.Println(runtime.GOOS)
 	switch runtime.GOOS {
 
 	case "android", "ios":
+		log.Println("mb")
 		return DeviceMobile
 
 	case "darwin":
-		// macOS → assume laptop (most are MacBooks)
+		log.Println("mac")
 		return DeviceLaptop
 
 	case "windows", "linux":
@@ -82,7 +85,7 @@ func LoadOrCreateIdentity() (*DeviceIdentity, error) {
 		return &DeviceIdentity{
 			ID:         row.ID,
 			Name:       row.Name,
-			DeviceType: ParseDeviceType(row.DeviceType),
+			DeviceType: DetectDeviceType(),
 			OS:         row.Os,
 			OSVersion:  row.OsVersion,
 			Arch:       row.Arch,
@@ -108,7 +111,7 @@ func LoadOrCreateIdentity() (*DeviceIdentity, error) {
 	identity := DeviceIdentity{
 		ID:         id,
 		Name:       fmt.Sprintf("%s's device", currentUser.Username),
-		DeviceType: "desktop",
+		DeviceType: DetectDeviceType(),
 		OS:         runtime.GOOS,
 		OSVersion:  "unknown",
 		Arch:       runtime.GOARCH,

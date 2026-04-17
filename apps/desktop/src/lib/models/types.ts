@@ -1,4 +1,4 @@
-export type DeviceType = "mac" | "desktop" | "phone";
+export type DeviceType = "laptop" | "desktop" | "mobile";
 
 export type Device = {
   id: string;
