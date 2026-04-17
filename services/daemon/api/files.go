@@ -6,6 +6,7 @@ import (
 	"io"
 	"lan-share/daemon/api/res"
 	"lan-share/daemon/internal/filetransfer"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -68,6 +69,7 @@ func (s *Server) listFilesHandler(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	log.Println("uploading file")
 
 	filename, contentType, body, closeFn, err := extractUpload(r)
 	if err != nil {
@@ -83,6 +85,7 @@ func (s *Server) uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	log.Println("sending file")
 	_ = json.NewEncoder(w).Encode(FileUploadResponse{
 		BaseResponse: res.NewBaseResponse(),
 		File:         toFileResponse(stored),
@@ -94,6 +97,7 @@ func (s *Server) fileDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	log.Println("downlaoding file")
 
 	id := strings.TrimPrefix(r.URL.Path, "/api/files/")
 	if id == "" || strings.Contains(id, "/") {

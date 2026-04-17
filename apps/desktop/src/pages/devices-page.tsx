@@ -4,6 +4,8 @@ import { SendFileModal } from "../components/file/SendFile";
 import { useDevices } from "../context/device-context";
 import { DeviceCardProps } from "../lib/models/types";
 
+const API_BASE_URL = "http://127.0.0.1:43821";
+
 export function DevicesPage() {
   const { devices, error, isLoading } = useDevices();
 
@@ -64,9 +66,10 @@ function PairedDevices() {
 
 function DeviceCard({ device }: DeviceCardProps) {
   const [open, setOpen] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const { devices } = useDevices();
 
-  console.log(device);
   const icon =
     device.type == "laptop" ? (
       <Laptop />
@@ -100,13 +103,55 @@ function DeviceCard({ device }: DeviceCardProps) {
       >
         Send
       </button>
+
+      {sendSuccess ? (
+        <div className="rounded border border-green-900 bg-green-950/40 px-3 py-2 text-xs text-green-300">
+          {sendSuccess}
+        </div>
+      ) : null}
+
+      {sendError ? (
+        <div className="rounded border border-red-900 bg-red-950/40 px-3 py-2 text-xs text-red-300">
+          {sendError}
+        </div>
+      ) : null}
+
       <SendFileModal
         open={open}
         onClose={() => setOpen(false)}
         devices={devices}
         selectedDeviceId={device.id}
         onSend={async (file, deviceId) => {
-          console.log("send", { file, deviceId });
+          setSendError(null);
+          setSendSuccess(null);
+
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("deviceId", deviceId);
+
+            const response = await fetch(`${API_BASE_URL}/api/files`, {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error(`File upload failed with ${response.status}.`);
+            }
+
+            const payload = (await response.json()) as {
+              file?: { name?: string };
+            };
+
+            setSendSuccess(
+              `Uploaded ${payload.file?.name ?? file.name} for ${device.name}.`,
+            );
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "File upload failed.";
+            setSendError(message);
+            throw error;
+          }
         }}
       />
     </div>
