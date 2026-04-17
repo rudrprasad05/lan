@@ -46,6 +46,8 @@ func (s *Server) devicesHandler(w http.ResponseWriter, r *http.Request) {
 			BaseResponse: res.NewBaseResponse(),
 			ID:           device.ID,
 			Name:         device.Name,
+			OS:           device.OS,
+			Arch:         device.Arch,
 			Type:         string(device.DeviceType),
 			IP:           device.IP,
 			State:        string(device.State),
